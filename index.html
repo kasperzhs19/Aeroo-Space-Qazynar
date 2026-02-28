@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SPACE STATION COSMOMIND - Crisis Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap');
+
+        :root {
+            --primary-color: #00f3ff;
+            --secondary-color: #008f99;
+            --bg-dark: #050a10;
+            --bg-panel: rgba(10, 20, 30, 0.85);
+            --alert-red: #ff2a2a;
+            --warn-yellow: #ffcc00;
+            --success-green: #00ff66;
+            --glow-primary: 0 0 8px rgba(0, 243, 255, 0.3);
+            --glow-alert: 0 0 10px rgba(255, 42, 42, 0.3);
+            --glow-text: 0 0 3px rgba(0, 243, 255, 0.25);
+        }
+
+        * { transition: color 0.4s ease, background-color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, opacity 0.4s ease; }
+
+        body {
+            background-color: #020406;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--primary-color);
+            overflow-x: hidden;
+            overflow-y: auto;
+            margin: 0; padding: 0;
+            min-height: 100vh;
+            background-image: radial-gradient(circle at 50% 50%, #0a1525 0%, #000000 100%);
+        }
+
+        h1, h2, h3, .header-font { font-family: 'Orbitron', sans-serif; letter-spacing: 2px; }
+
+        .stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; background: transparent; }
+        .star { position: absolute; background: white; border-radius: 50%; opacity: 0.5; animation: twinkle var(--duration) ease-in-out infinite; }
+        @keyframes twinkle { 0%, 100% { opacity: 0.2; transform: scale(0.9); } 50% { opacity: 0.7; transform: scale(1.1); } }
+
+        .hud-panel {
+            background: var(--bg-panel); border: 1px solid rgba(0, 143, 153, 0.6);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.06); position: relative;
+            backdrop-filter: blur(6px);
+            clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+            transition: border-color 0.6s ease, box-shadow 0.6s ease;
+        }
+        .hud-panel::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 1px; background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.4), transparent); opacity: 0.4; }
+        .hud-panel.critical { border-color: rgba(255, 42, 42, 0.5); box-shadow: 0 0 8px rgba(255, 42, 42, 0.15); }
+        .hud-panel.critical::before { background: linear-gradient(90deg, transparent, rgba(255, 42, 42, 0.4), transparent); }
+
+        .scanlines { background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.05) 50%, rgba(0,0,0,0.05)); background-size: 100% 4px; position: fixed; inset: 0; pointer-events: none; z-index: 50; opacity: 0.15; }
+
+        .pulse-text { animation: pulse 3s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        .pulse-border-red { animation: pulseRed 2.5s ease-in-out 1; }
+        @keyframes pulseRed { 0% { box-shadow: 0 0 2px rgba(255, 150, 100, 0.1); border-color: rgba(0, 143, 153, 0.6); } 50% { box-shadow: 0 0 6px rgba(255, 150, 100, 0.2); border-color: rgba(200, 120, 80, 0.5); } 100% { box-shadow: 0 0 2px rgba(255, 150, 100, 0.1); border-color: rgba(0, 143, 153, 0.6); } }
+
+        .result-border-fail { border-color: rgba(200, 120, 80, 0.5) !important; box-shadow: 0 0 6px rgba(200, 120, 80, 0.1); }
+        .result-border-partial { border-color: rgba(180, 160, 60, 0.5) !important; box-shadow: 0 0 6px rgba(180, 160, 60, 0.1); }
+        .result-border-success { border-color: rgba(60, 180, 100, 0.5) !important; box-shadow: 0 0 6px rgba(60, 180, 100, 0.1); }
+
+        .cursor-blink::after { content: '_'; animation: blink 1.2s ease-in-out infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+        .stat-container { background: rgba(0,0,0,0.4); border: 1px solid rgba(50,50,50,0.6); height: 6px; overflow: hidden; border-radius: 1px; }
+        .stat-fill { height: 100%; transition: width 0.8s ease-out, background-color 0.8s ease; border-radius: 1px; }
+
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #050a10; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 143, 153, 0.5); border-radius: 2px; }
+
+        .btn-tech { background: rgba(0, 243, 255, 0.06); border: 1px solid rgba(0, 243, 255, 0.4); color: var(--primary-color); font-family: 'Orbitron', sans-serif; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s ease; position: relative; overflow: hidden; cursor: pointer; }
+        .btn-tech:hover:not(:disabled) { background: rgba(0, 243, 255, 0.15); color: #fff; box-shadow: 0 0 10px rgba(0, 243, 255, 0.2); border-color: var(--primary-color); }
+        .btn-tech:disabled { border-color: rgba(50,50,50,0.5); color: #444; cursor: not-allowed; background: rgba(0,0,0,0.15); }
+
+        .ai-box { border-left: 2px solid rgba(96, 165, 250, 0.5); background: linear-gradient(90deg, rgba(96,165,250,0.04) 0%, transparent 100%); }
+        .ai-loading span { display: inline-block; width: 3px; height: 3px; background-color: rgba(96, 165, 250, 0.7); margin-right: 2px; border-radius: 50%; animation: wave 1.2s ease-in-out infinite; }
+        .ai-loading span:nth-child(2) { animation-delay: 0.15s; }
+        .ai-loading span:nth-child(3) { animation-delay: 0.3s; }
+        @keyframes wave { 0%, 100% { transform: translateY(0); opacity: 0.4; } 50% { transform: translateY(-4px); opacity: 1; } }
+
+        .alert-badge { animation: alertPulse 3s ease-in-out infinite; }
+        @keyframes alertPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+
+        .fade-in { animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        body.intro-mode { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        body.game-mode { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 1rem; padding-bottom: 1rem; }
+
+        .lang-switcher { position: fixed; top: 12px; right: 12px; z-index: 60; display: flex; gap: 2px; }
+        .lang-btn {
+            font-family: 'Orbitron', sans-serif; font-size: 10px; padding: 5px 10px;
+            background: rgba(0,0,0,0.7); border: 1px solid rgba(0, 143, 153, 0.3);
+            color: rgba(0, 243, 255, 0.4); cursor: pointer; letter-spacing: 1px;
+            transition: all 0.3s; backdrop-filter: blur(4px);
+        }
+        .lang-btn:hover { color: #fff; border-color: rgba(0, 243, 255, 0.6); }
+        .lang-btn.active { background: rgba(0, 243, 255, 0.12); color: #00f3ff; border-color: rgba(0, 243, 255, 0.6); }
+    </style>
+</head>
+<body class="intro-mode selection:bg-cyan-900 selection:text-white text-lg">
+
+    <div id="starfield" class="stars"></div>
+    <div class="scanlines"></div>
+
+    <div class="lang-switcher">
+        <button class="lang-btn active" data-lang="en" onclick="setLang('en')">ENG</button>
+        <button class="lang-btn" data-lang="ru" onclick="setLang('ru')">RUS</button>
+        <button class="lang-btn" data-lang="kz" onclick="setLang('kz')">KAZ</button>
+    </div>
+
+    <!-- Intro Screen -->
+    <div id="intro-screen" class="hud-panel p-10 max-w-3xl text-center z-20 flex flex-col items-center gap-8 m-4">
+        <h1 class="text-6xl md:text-8xl font-black tracking-tighter mb-2 text-cyan-400 drop-shadow-[0_0_8px_rgba(0,243,255,0.5)]">COSMOMIND</h1>
+        <div class="h-[1px] w-full bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent"></div>
+        <div id="intro-text" class="text-xl md:text-2xl min-h-[120px] text-left leading-relaxed text-cyan-100 font-light"></div>
+        <button id="start-btn" class="hidden btn-tech py-4 px-12 text-2xl font-bold rounded-sm pulse-text">INITIALIZE SYSTEMS</button>
+    </div>
+
+    <!-- Main Game Container -->
+    <div id="game-container" class="w-full max-w-6xl p-4 flex flex-col gap-4 relative z-10 hidden" style="display: none;">
+        <div id="status-bar" class="hud-panel p-4 flex flex-col md:flex-row justify-between items-center gap-4 bg-black/70 shrink-0">
+            <div class="flex flex-col">
+                <span class="header-font text-2xl font-bold text-white tracking-widest">STATION COSMOMIND</span>
+                <span id="lbl-console" class="text-xs text-cyan-600/70 tracking-[0.2em]">CHIEF ENGINEER CONSOLE // AUTH: ALPHA-1</span>
+            </div>
+            <div class="flex items-center gap-6 flex-wrap justify-center">
+                <div class="flex flex-col w-24">
+                    <div class="flex justify-between text-xs mb-1 text-gray-500"><span id="lbl-hull">HULL</span><span id="val-integrity">100%</span></div>
+                    <div class="stat-container"><div id="stat-integrity" class="stat-fill bg-cyan-500/80" style="width: 100%"></div></div>
+                </div>
+                <div class="flex flex-col w-24">
+                    <div class="flex justify-between text-xs mb-1 text-gray-500"><span id="lbl-crew">CREW</span><span id="val-health">100%</span></div>
+                    <div class="stat-container"><div id="stat-health" class="stat-fill bg-cyan-500/80" style="width: 100%"></div></div>
+                </div>
+                <div class="flex flex-col w-24">
+                    <div class="flex justify-between text-xs mb-1 text-gray-500"><span>O2</span><span id="val-oxygen">100%</span></div>
+                    <div class="stat-container"><div id="stat-oxygen" class="stat-fill bg-cyan-500/80" style="width: 100%"></div></div>
+                </div>
+                <div class="flex flex-col w-24">
+                    <div class="flex justify-between text-xs mb-1 text-gray-500"><span id="lbl-pwr">PWR</span><span id="val-power">100%</span></div>
+                    <div class="stat-container"><div id="stat-power" class="stat-fill bg-cyan-500/80" style="width: 100%"></div></div>
+                </div>
+            </div>
+            <div class="border border-cyan-900/50 bg-cyan-950/20 px-4 py-2 rounded text-center min-w-[120px]">
+                <div id="lbl-scenario" class="text-[10px] text-cyan-500/60 uppercase tracking-wider">Scenario</div>
+                <div id="scenario-counter" class="header-font text-2xl text-white">1 / 20</div>
+            </div>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-4">
+            <div id="terminal-interface" class="hud-panel p-6 flex-grow flex flex-col gap-6 lg:w-2/3">
+                <div class="flex items-start gap-4 border-b border-gray-800/60 pb-4">
+                    <div id="lbl-alert" class="alert-badge bg-amber-500/10 border border-amber-500/50 text-amber-400 px-3 py-1 rounded text-sm font-bold">⚠ ALERT</div>
+                    <h2 id="scenario-title" class="text-3xl font-bold text-white uppercase leading-none mt-1">REACTOR FAILURE</h2>
+                </div>
+                <div class="relative">
+                    <p id="scenario-desc" class="text-xl text-cyan-100/90 leading-relaxed">Initializing crisis parameters...</p>
+                    <div class="mt-6 bg-black/30 border-l-3 border-cyan-600/50 p-4 rounded-r">
+                        <div id="lbl-telemetry" class="text-xs text-cyan-500/60 uppercase tracking-widest mb-2 font-bold">/// SYSTEM TELEMETRY</div>
+                        <p id="system-readings" class="font-mono text-sm md:text-base text-cyan-300/80">Reading data streams...</p>
+                    </div>
+                </div>
+                <div id="ai-section" class="hidden flex-col gap-2 mt-2">
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 rounded-full bg-blue-400/60 pulse-text"></div>
+                        <span id="lbl-ai-advisor" class="text-xs font-bold text-blue-400/70 uppercase tracking-wider">AI ADVISOR — KAORU // NEURAL ANALYSIS</span>
+                    </div>
+                    <div id="ai-response-box" class="ai-box p-4 text-sm text-blue-100/90 font-mono min-h-[80px] max-h-[280px] overflow-y-auto leading-relaxed"></div>
+                </div>
+                <div class="flex-grow"></div>
+                <div class="flex flex-col gap-3 mt-4">
+                    <div class="flex justify-between items-end">
+                        <label id="lbl-command" for="player-input" class="text-sm text-gray-500">COMMAND INPUT >></label>
+                        <span id="char-count" class="text-xs text-gray-600">0 CHARS</span>
+                    </div>
+                    <textarea id="player-input" rows="3" class="w-full bg-black/40 border border-gray-700/50 focus:border-cyan-500/60 text-cyan-300 p-4 outline-none font-mono text-lg resize-none placeholder-gray-700 rounded-sm transition-all duration-300" placeholder="ENTER PROTOCOL..." autocomplete="off" spellcheck="false"></textarea>
+                    <div class="flex gap-3 h-12">
+                        <button id="ai-assist-btn" class="btn-tech w-1/4 md:w-1/5 flex items-center justify-center gap-2 border-blue-500/30 text-blue-400/80 text-sm md:text-base">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" /></svg>
+                            <span id="lbl-ai-assist" class="hidden md:inline">AI ASSIST</span>
+                        </button>
+                        <button id="submit-btn" class="btn-tech flex-grow font-bold text-xl tracking-widest disabled:opacity-30">EXECUTE PROTOCOL</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="feedback-panel" class="hidden lg:flex hud-panel p-6 lg:w-1/3 flex-col bg-black/80 relative overflow-hidden">
+                <div class="border-b border-gray-800/50 pb-2 mb-4"><span id="lbl-mission-log" class="header-font text-gray-600">MISSION LOG</span></div>
+                <div id="feedback-content" class="flex flex-col items-center justify-center h-full text-center opacity-0 transition-all duration-700">
+                    <h3 id="feedback-title" class="header-font text-3xl font-bold mb-2">RESOLVED</h3>
+                    <div id="feedback-score" class="text-5xl font-mono font-bold mb-6 text-white">85%</div>
+                    <p id="feedback-text" class="text-gray-400 mb-8 text-sm leading-relaxed"></p>
+                    <div class="w-full bg-gray-900/40 p-3 rounded text-left border border-gray-800/50">
+                        <div id="lbl-keyword" class="text-[10px] uppercase text-gray-600 mb-2">Keyword Analysis</div>
+                        <div id="keyword-feedback" class="flex flex-wrap gap-2 text-xs"></div>
+                    </div>
+                    <div class="mt-auto w-full pt-8">
+                        <div class="text-[10px] text-gray-600 uppercase mb-1 flex justify-between">
+                            <span id="lbl-next-crisis">Next Crisis In...</span>
+                            <span id="timer-text">6.0s</span>
+                        </div>
+                        <div class="h-1 bg-gray-800/50 w-full rounded"><div id="next-timer-bar" class="h-full bg-cyan-500/40 w-0 rounded transition-all"></div></div>
+                    </div>
+                </div>
+                <div id="feedback-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-800/60 text-sm uppercase tracking-widest">Awaiting Input...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
+        <div class="hud-panel p-8 max-w-4xl w-full flex flex-col items-center text-center border-cyan-900/40 shadow-[0_0_20px_rgba(0,243,255,0.06)]">
+            <h2 id="final-title" class="text-5xl md:text-7xl font-bold mb-2 header-font text-white">MISSION REPORT</h2>
+            <p id="final-rank" class="text-2xl mb-8 uppercase tracking-widest font-mono">RANK: SENIOR ENGINEER</p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-8">
+                <div class="bg-gray-900/40 p-3 border border-gray-800/50 rounded"><div id="lbl-f-integrity" class="text-xs text-gray-500">INTEGRITY</div><div id="final-integrity" class="text-2xl font-mono text-cyan-400">0%</div></div>
+                <div class="bg-gray-900/40 p-3 border border-gray-800/50 rounded"><div id="lbl-f-health" class="text-xs text-gray-500">HEALTH</div><div id="final-health" class="text-2xl font-mono text-cyan-400">0%</div></div>
+                <div class="bg-gray-900/40 p-3 border border-gray-800/50 rounded"><div id="lbl-f-oxygen" class="text-xs text-gray-500">OXYGEN</div><div id="final-oxygen" class="text-2xl font-mono text-cyan-400">0%</div></div>
+                <div class="bg-gray-900/40 p-3 border border-gray-800/50 rounded"><div id="lbl-f-power" class="text-xs text-gray-500">POWER</div><div id="final-power" class="text-2xl font-mono text-cyan-400">0%</div></div>
+            </div>
+            <div class="text-left w-full h-64 overflow-y-auto border border-gray-800/50 bg-black/30 p-4 mb-8 font-mono text-xs md:text-sm rounded">
+                <table class="w-full border-collapse">
+                    <thead class="text-gray-500 border-b border-gray-800/50">
+                        <tr><th class="text-left py-2">#</th><th id="th-scenario" class="text-left py-2">SCENARIO</th><th id="th-efficiency" class="text-right py-2">EFFICIENCY</th><th id="th-status" class="text-right py-2">STATUS</th></tr>
+                    </thead>
+                    <tbody id="scenario-summary-list"></tbody>
+                </table>
+            </div>
+            <button id="btn-restart" onclick="location.reload()" class="btn-tech py-3 px-10 text-xl font-bold">RESTART SIMULATION</button>
+        </div>
+    </div>
+
+    <script>
+        // ======== STARFIELD ========
+        const starfield = document.getElementById('starfield');
+        for(let i=0;i<60;i++){const s=document.createElement('div');s.className='star';s.style.left=`${Math.random()*100}%`;s.style.top=`${Math.random()*100}%`;const sz=Math.random()*1.5+0.5;s.style.width=`${sz}px`;s.style.height=`${sz}px`;s.style.setProperty('--duration',`${Math.random()*4+3}s`);starfield.appendChild(s);}
+
+        // ======== TRANSLATIONS ========
+        let currentLang = 'en';
+
+        const UI = {
+            en: {
+                introMsg: "Welcome aboard Space Station Omega, Chief Engineer.\n\nStatus: CRITICAL.\nMission: SURVIVE.\n\nInitialize interface when ready...",
+                initSystems: "INITIALIZE SYSTEMS",
+                console: "CHIEF ENGINEER CONSOLE // AUTH: ALPHA-1",
+                hull: "HULL", crew: "CREW", pwr: "PWR",
+                scenarioLabel: "Scenario",
+                alert: "⚠ ALERT",
+                telemetry: "/// SYSTEM TELEMETRY",
+                aiAdvisor: "AI ADVISOR — KAORU // NEURAL ANALYSIS",
+                commandInput: "COMMAND INPUT >>",
+                chars: "CHARS",
+                placeholder: "ENTER PROTOCOL...",
+                aiAssist: "AI ASSIST",
+                executeProtocol: "EXECUTE PROTOCOL",
+                missionLog: "MISSION LOG",
+                keywordAnalysis: "Keyword Analysis",
+                nextCrisis: "Next Crisis In...",
+                awaitingInput: "Awaiting Input...",
+                crisisResolved: "CRISIS RESOLVED",
+                partiallyResolved: "PARTIALLY RESOLVED",
+                roomForImprovement: "ROOM FOR IMPROVEMENT",
+                feedbackGood: "Well done, Engineer. Your protocol addressed the core issues effectively. Systems are stabilizing.",
+                feedbackPartial: "Good effort — the crisis was contained with manageable damage. Review the keyword analysis below to strengthen future responses.",
+                feedbackBad: "The approach needs refinement. Check the keyword analysis — incorporating more specific technical terms will help in future scenarios. Keep going!",
+                missionReport: "MISSION REPORT",
+                missionComplete: "MISSION COMPLETE",
+                simulationEnded: "SIMULATION ENDED",
+                systemsCritical: "SYSTEMS CRITICAL — SIMULATION CONCLUDED EARLY",
+                rankLabel: "RANK",
+                legendary: "LEGENDARY ENGINEER",
+                senior: "SENIOR ENGINEER",
+                junior: "JUNIOR ENGINEER",
+                cadet: "CADET",
+                resolved: "RESOLVED", partial: "PARTIAL", review: "REVIEW",
+                restartSim: "RESTART SIMULATION",
+                integrity: "INTEGRITY", health: "HEALTH", oxygen: "OXYGEN", power: "POWER",
+                thScenario: "SCENARIO", thEfficiency: "EFFICIENCY", thStatus: "STATUS",
+                analyzingCrisis: "Analyzing crisis data",
+                apiKeyMissing: "ERROR: API KEY MISSING.",
+                signalInterference: "Signal interference — unable to process advisory.",
+                neuralLinkInterrupted: "Neural link interrupted. Please try again on next scenario.",
+                aiLangInstruction: ""
+            },
+            ru: {
+                introMsg: "Добро пожаловать на борт станции «Омега», Главный инженер.\n\nСтатус: КРИТИЧЕСКИЙ.\nМиссия: ВЫЖИТЬ.\n\nИнициализируйте систему, когда будете готовы...",
+                initSystems: "ЗАПУСК СИСТЕМ",
+                console: "КОНСОЛЬ ГЛАВНОГО ИНЖЕНЕРА // ДОСТУП: АЛЬФА-1",
+                hull: "КОРПУС", crew: "ЭКИПАЖ", pwr: "ЭНЕРГ",
+                scenarioLabel: "Сценарий",
+                alert: "⚠ ТРЕВОГА",
+                telemetry: "/// ТЕЛЕМЕТРИЯ СИСТЕМ",
+                aiAdvisor: "ИИ-СОВЕТНИК — КАОРУ // НЕЙРОАНАЛИЗ",
+                commandInput: "ВВОД КОМАНДЫ >>",
+                chars: "СИМВ.",
+                placeholder: "ВВЕДИТЕ ПРОТОКОЛ...",
+                aiAssist: "ИИ ПОМОЩЬ",
+                executeProtocol: "ВЫПОЛНИТЬ ПРОТОКОЛ",
+                missionLog: "ЖУРНАЛ МИССИИ",
+                keywordAnalysis: "Анализ ключевых слов",
+                nextCrisis: "Следующий кризис через...",
+                awaitingInput: "Ожидание ввода...",
+                crisisResolved: "КРИЗИС РАЗРЕШЁН",
+                partiallyResolved: "ЧАСТИЧНО РАЗРЕШЁН",
+                roomForImprovement: "ЕСТЬ НАД ЧЕМ РАБОТАТЬ",
+                feedbackGood: "Отличная работа, Инженер. Ваш протокол эффективно решил ключевые проблемы. Системы стабилизируются.",
+                feedbackPartial: "Хорошая попытка — кризис локализован с приемлемым ущербом. Просмотрите анализ ключевых слов для улучшения будущих ответов.",
+                feedbackBad: "Подход требует доработки. Проверьте анализ ключевых слов — использование более точных технических терминов поможет в будущих сценариях. Продолжайте!",
+                missionReport: "ОТЧЁТ О МИССИИ",
+                missionComplete: "МИССИЯ ЗАВЕРШЕНА",
+                simulationEnded: "СИМУЛЯЦИЯ ЗАВЕРШЕНА",
+                systemsCritical: "КРИТИЧЕСКОЕ СОСТОЯНИЕ — СИМУЛЯЦИЯ ЗАВЕРШЕНА ДОСРОЧНО",
+                rankLabel: "РАНГ",
+                legendary: "ЛЕГЕНДАРНЫЙ ИНЖЕНЕР",
+                senior: "СТАРШИЙ ИНЖЕНЕР",
+                junior: "МЛАДШИЙ ИНЖЕНЕР",
+                cadet: "КАДЕТ",
+                resolved: "РЕШЕНО", partial: "ЧАСТИЧНО", review: "ДОРАБОТКА",
+                restartSim: "ПЕРЕЗАПУСК СИМУЛЯЦИИ",
+                integrity: "ЦЕЛОСТНОСТЬ", health: "ЗДОРОВЬЕ", oxygen: "КИСЛОРОД", power: "ЭНЕРГИЯ",
+                thScenario: "СЦЕНАРИЙ", thEfficiency: "ЭФФЕКТИВНОСТЬ", thStatus: "СТАТУС",
+                analyzingCrisis: "Анализ кризисных данных",
+                apiKeyMissing: "ОШИБКА: КЛЮЧ API ОТСУТСТВУЕТ.",
+                signalInterference: "Помехи сигнала — невозможно обработать рекомендацию.",
+                neuralLinkInterrupted: "Нейронная связь прервана. Попробуйте снова на следующем сценарии.",
+                aiLangInstruction: "You MUST respond entirely in Russian language."
+            },
+            kz: {
+                introMsg: "Omega ғарыш станциясына қош келдіңіз, Бас инженер.\n\nКүйі: СЫНИ.\nМиссия: АМАН ҚАЛУ.\n\nДайын болғанда жүйені іске қосыңыз...",
+                initSystems: "ЖҮЙЕНІ ІСКЕ ҚОСУ",
+                console: "БАС ИНЖЕНЕР КОНСОЛІ // РҰҚСАТ: АЛЬФА-1",
+                hull: "КОРПУС", crew: "ЭКИПАЖ", pwr: "ҚУАТ",
+                scenarioLabel: "Сценарий",
+                alert: "⚠ ДАБЫЛ",
+                telemetry: "/// ЖҮЙЕ ТЕЛЕМЕТРИЯСЫ",
+                aiAdvisor: "ЖИ КЕҢЕСШІ — КАОРУ // НЕЙРОТАЛДАУ",
+                commandInput: "КОМАНДА ЕНГІЗУ >>",
+                chars: "ТАҢБА",
+                placeholder: "ХАТТАМАНЫ ЕНГІЗІҢІЗ...",
+                aiAssist: "ЖИ КӨМЕК",
+                executeProtocol: "ХАТТАМАНЫ ОРЫНДАУ",
+                missionLog: "МИССИЯ ЖУРНАЛЫ",
+                keywordAnalysis: "Кілт сөздер талдауы",
+                nextCrisis: "Келесі дағдарыс...",
+                awaitingInput: "Енгізуді күту...",
+                crisisResolved: "ДАҒДАРЫС ШЕШІЛДІ",
+                partiallyResolved: "ІШІНАРА ШЕШІЛДІ",
+                roomForImprovement: "ЖАҚСАРТУҒА БОЛАДЫ",
+                feedbackGood: "Жақсы жұмыс, Инженер. Сіздің хаттамаңыз негізгі мәселелерді тиімді шешті. Жүйелер тұрақтануда.",
+                feedbackPartial: "Жақсы әрекет — дағдарыс қолайлы зақыммен жойылды. Болашақ жауаптарды жақсарту үшін кілт сөздер талдауын қараңыз.",
+                feedbackBad: "Тәсіл жетілдіруді қажет етеді. Кілт сөздер талдауын тексеріңіз — дәлірек техникалық терминдерді қолдану болашақ сценарийлерде көмектеседі. Жалғастырыңыз!",
+                missionReport: "МИССИЯ ЕСЕБІ",
+                missionComplete: "МИССИЯ АЯҚТАЛДЫ",
+                simulationEnded: "СИМУЛЯЦИЯ АЯҚТАЛДЫ",
+                systemsCritical: "ЖҮЙЕЛЕР СЫНИ — СИМУЛЯЦИЯ МЕРЗІМІНЕН БҰРЫН АЯҚТАЛДЫ",
+                rankLabel: "ДӘРЕЖЕ",
+                legendary: "АҢЫЗДЫҚ ИНЖЕНЕР",
+                senior: "АҒА ИНЖЕНЕР",
+                junior: "КІШІ ИНЖЕНЕР",
+                cadet: "КАДЕТ",
+                resolved: "ШЕШІЛДІ", partial: "ІШІНАРА", review: "ҚАЙТА ҚАРАУ",
+                restartSim: "ҚАЙТА БАСТАУ",
+                integrity: "ТҰТАСТЫҚ", health: "ДЕНСАУЛЫҚ", oxygen: "ОТТЕГІ", power: "ҚУАТ",
+                thScenario: "СЦЕНАРИЙ", thEfficiency: "ТИІМДІЛІК", thStatus: "МӘРТЕБЕ",
+                analyzingCrisis: "Дағдарыс деректерін талдау",
+                apiKeyMissing: "ҚАТЕ: API КІЛТІ ЖОҚ.",
+                signalInterference: "Сигнал кедергісі — кеңесті өңдеу мүмкін емес.",
+                neuralLinkInterrupted: "Нейрондық байланыс үзілді. Келесі сценарийде қайталаңыз.",
+                aiLangInstruction: "You MUST respond entirely in Kazakh language."
+            }
+        };
+
+        // ======== SCENARIO DATA (English base) ========
+        const scenarios = [
+            { title:"REACTOR CORE MELTDOWN", desc:"The primary fusion reactor is experiencing an uncontrolled chain reaction. Core temperature has exceeded 15,000°C and rising. Containment field is failing. You have minutes before a catastrophic explosion destroys the entire station.", readings:"Core Temp: 15,247°C | Containment Field: 23% | Radiation: 850 rads | Coolant Pressure: Critical", keywords:["coolant","shutdown","containment","rods","control","emergency","vent","radiation","seal","backup"], failStats:{integrity:30,power:25} },
+            { title:"OXYGEN SYSTEM FAILURE", desc:"The electrolysis units that split water into breathable oxygen have simultaneously failed. CO2 levels are rising rapidly across all decks. Crew members are reporting headaches and dizziness. Estimated breathable air remaining: 4 hours.", readings:"O2 Level: 14% (dropping) | CO2: 3.2% (rising) | Electrolysis Units: OFFLINE | Backup O2 Tanks: 2 hours reserve", keywords:["electrolysis","repair","backup","tanks","co2","scrubbers","filters","ventilation","oxygen","water"], failStats:{oxygen:35,health:20} },
+            { title:"HULL BREACH - SECTION 7", desc:"A micrometeorite has punctured the outer hull in Section 7 - the crew quarters. Air is rapidly escaping into space. Pressure alarms are blaring. Three crew members are trapped inside the section behind a jammed bulkhead door.", readings:"Section 7 Pressure: 0.6 atm (dropping) | Breach Size: 4.2 cm | Bulkhead Door: JAMMED | Trapped Crew: 3", keywords:["seal","patch","bulkhead","evacuate","pressure","airlock","weld","emergency","rescue","suit"], failStats:{integrity:25,health:25,oxygen:15} },
+            { title:"NAV COMPUTER COMPROMISED", desc:"An unknown digital entity has infected the main navigation computer. The station's orbit is decaying and you're slowly falling toward Jupiter's gravitational pull. Thruster controls are locked out and the computer is displaying alien symbols.", readings:"Orbital Altitude: 412,000 km (declining) | Descent Rate: 12 km/h | Nav Computer: COMPROMISED | Thrusters: LOCKED", keywords:["reboot","manual","backup","firewall","thrusters","override","isolate","virus","purge","orbit"], failStats:{integrity:30} },
+            { title:"SOLAR FLARE IMMINENT", desc:"Deep space sensors have detected a massive coronal mass ejection heading directly for the station. Impact in 45 minutes. The electromagnetic pulse will fry all unshielded electronics and the radiation burst will be lethal to any exposed crew.", readings:"Flare Classification: X-28 | ETA: 45 min | Shield Status: STANDBY | Radiation Forecast: 2000+ rads", keywords:["shield","shelter","radiation","faraday","shielding","electronics","protect","bunker","magnetic","power"], failStats:{health:30,power:25} },
+            { title:"GRAVITY GENERATOR ERROR", desc:"The centrifugal gravity system has begun spinning erratically. Some sections experience 3G crushing force while others are in zero-G. Equipment is flying around, crew members are injured, and the structural supports are groaning under the uneven stress.", readings:"Section A: 3.1G | Section B: 0.0G | Section C: 1.8G | Spin Motor: ERRATIC | Structural Stress: HIGH", keywords:["stabilize","motor","calibrate","spin","gradually","secure","reduce","bearings","balance","decelerate"], failStats:{integrity:20,health:20} },
+            { title:"WATER SUPPLY CONTAMINATION", desc:"The water purification system has been contaminated with an unknown chemical compound. All recycled water is now toxic. The station's entire water supply serves 50 crew members and you have only 48 hours of clean water reserves remaining.", readings:"Contamination: UNKNOWN COMPOUND | Toxicity: HIGH | Clean Water Reserve: 48 hrs | Affected Systems: ALL water lines", keywords:["filter","purify","distill","isolate","contamination","test","backup","reserve","chemical","flush"], failStats:{health:25,oxygen:10} },
+            { title:"COMMS ARRAY DESTROYED", desc:"A collision with space debris has completely destroyed the main communications array. You have no contact with Earth, no way to send distress signals, and a supply ship is due to arrive in 3 weeks and won't know your current status or docking coordinates.", readings:"Main Array: DESTROYED | Backup Transmitter: LOW POWER | Signal Range: 0.001 AU | Next Supply Ship: 21 days", keywords:["repair","antenna","signal","boost","transmitter","beacon","frequency","salvage","relay","emergency"], failStats:{health:10} },
+            { title:"LABORATORY FIRE", desc:"A chemical fire has erupted in the main laboratory. The fire suppression system has failed to activate. Toxic fumes from burning experiments are spreading through the ventilation system. Valuable research data and irreplaceable samples are at risk.", readings:"Lab Temp: 340°C | Fire Suppression: OFFLINE | Toxic Fumes: DETECTED in Vents | Ventilation: CONTAMINATED", keywords:["extinguisher","ventilation","seal","suppress","oxygen","evacuate","shut","isolate","foam","depressurize"], failStats:{oxygen:20,health:15,integrity:10} },
+            { title:"DOCKING CLAMP FAILURE", desc:"The automated supply ship has arrived but the docking clamps are malfunctioning. The ship is drifting closer with misaligned trajectory. If it impacts the station at current speed, it will cause catastrophic damage. If it drifts away, you lose critical supplies.", readings:"Supply Ship Distance: 200m | Approach Speed: 2.1 m/s | Docking Clamps: JAMMED | Alignment: 12° OFF", keywords:["manual","thrusters","align","clamps","override","tether","eva","spacewalk","guide","slow"], failStats:{integrity:20,health:10} },
+            { title:"MEDICAL EMERGENCY", desc:"Dr. Vasquez, your chief medical officer, has collapsed with symptoms of acute appendicitis. She is the only surgeon on board. The auto-surgical unit requires precise calibration that only she knows, and her condition is deteriorating rapidly.", readings:"Patient: Dr. Vasquez | Condition: ACUTE ABDOMEN | Auto-Surgeon: UNCALIBRATED | Medical Database: AVAILABLE", keywords:["surgery","database","instructions","calibrate","auto","guide","anesthesia","remote","earth","assist"], failStats:{health:30} },
+            { title:"HYDROPONICS BLIGHT", desc:"The hydroponic gardens that provide 60% of the station's food supply have been infected with an aggressive fungal blight. Plants are dying rapidly across all growing bays. If the blight is not contained, the station faces starvation within weeks.", readings:"Infected Bays: 8/10 | Crop Loss: 45% (increasing) | Fungal Type: UNKNOWN | Food Reserves: 30 days", keywords:["quarantine","fungicide","isolate","samples","clean","sterilize","seeds","reserve","ration","uv"], failStats:{health:20} },
+            { title:"POWER GRID CASCADE", desc:"A surge in the main power distribution network has caused a cascade failure. Systems are shutting down deck by deck. Life support is on emergency battery backup with only 6 hours of charge. The solar panels are intact but disconnected from the grid.", readings:"Main Grid: OFFLINE | Battery Backup: 6 hrs | Solar Panels: OPERATIONAL (disconnected) | Affected Decks: ALL", keywords:["bypass","reroute","solar","reconnect","circuit","breaker","reset","priority","distribute","repair"], failStats:{power:35,oxygen:15} },
+            { title:"BIOLOGICAL HAZARD", desc:"Biosensors have detected an unknown living organism in the ventilation ducts. It appears to have come from a recently collected sample from Jupiter's moon Europa. The organism is growing rapidly and seems to feed on the station's electrical insulation.", readings:"Organism Size: GROWING | Location: Vent Shafts C-F | Composition: UNKNOWN | Electrical Damage: INCREASING", keywords:["contain","trap","isolate","specimen","seal","vents","temperature","freeze","capture","quarantine"], failStats:{power:20,integrity:15} },
+            { title:"ESCAPE POD MALFUNCTION", desc:"A software glitch has armed all 8 escape pods for emergency launch. The countdown shows 10 minutes. If the pods launch empty, the crew loses all evacuation capability. The launch control panel is behind a sealed radiation door that requires a 30-minute cooldown to open.", readings:"Escape Pods: ALL ARMED | Countdown: 10:00 | Launch Override: BEHIND RAD DOOR | Door Cooldown: 30 min", keywords:["abort","override","wire","software","hack","disable","manual","cut","power","remote"], failStats:{health:15,integrity:10} },
+            { title:"DEBRIS FIELD IMPACT", desc:"Long-range radar shows a massive field of space debris from a destroyed satellite heading toward the station. Thousands of fragments ranging from 1cm to 2m in size. Impact in 2 hours. The station's maneuvering thrusters have limited fuel.", readings:"Debris Count: 4,700+ fragments | Largest: 2.1m | ETA: 2 hours | Thruster Fuel: 34% | Shield Plating: PARTIAL", keywords:["maneuver","dodge","shield","trajectory","calculate","rotate","protect","armor","thruster","track"], failStats:{integrity:30,health:15} },
+            { title:"CREW MUTINY", desc:"After months in deep space, tensions have reached a breaking point. A group of 12 crew members led by Officer Kane are threatening to seize control of the bridge and force a return to Earth, abandoning the mission. They have locked themselves in the weapons locker.", readings:"Crew Morale: 15% | Mutinous Crew: 12/50 | Weapons Locker: BREACHED | Bridge Access: CONTESTED", keywords:["negotiate","talk","compromise","listen","mediate","calm","address","grievances","safety","communication"], failStats:{health:25} },
+            { title:"ENGINE COOLANT LEAK", desc:"The primary engine coolant line has ruptured, spraying superheated coolant throughout the engine room. The engine is overheating and the toxic coolant vapor is making the area lethal to enter without protective gear. Only 2 hazmat suits are available.", readings:"Engine Temp: 890°C (rising) | Coolant Level: 12% | Toxic Vapor: LETHAL | Hazmat Suits: 2 available", keywords:["hazmat","suit","valve","shutoff","seal","patch","coolant","replace","vent","remote"], failStats:{power:25,integrity:15} },
+            { title:"SOLAR ARRAY MISALIGNMENT", desc:"The station's solar panel array tracking system has failed, causing all panels to lock facing away from the Sun. Power generation has dropped to 5% of normal capacity. Without full power restoration within 12 hours, life support will begin failing permanently.", readings:"Power Generation: 5% | Panel Alignment: 172° OFF | Tracking Motor: SEIZED | Battery Reserve: 12 hours", keywords:["realign","manual","motor","eva","spacewalk","repair","tracking","calibrate","rotate","override"], failStats:{power:30} },
+            { title:"ASTEROID IMPACT", desc:"MAXIMUM ALERT: A 50-meter asteroid has been detected on a direct collision course with the station. Impact in 90 minutes. This is an extinction-level event for the station. All previous damage makes this exponentially more dangerous.", readings:"Asteroid Size: 50m | Speed: 14 km/s | ETA: 90 min | Collision Probability: 99.7% | ALL SYSTEMS: STRAINED", keywords:["evacuate","deflect","thrust","move","redirect","missile","laser","fragment","orbit","escape","pods","calculate"], failStats:{integrity:40,health:40,oxygen:40,power:40} }
+        ];
+
+        // ======== SCENARIO TRANSLATIONS ========
+        const scenarioI18n = {
+            ru: [
+                { title:"РАСПЛАВЛЕНИЕ ЯДРА РЕАКТОРА", desc:"Основной термоядерный реактор испытывает неконтролируемую цепную реакцию. Температура ядра превысила 15 000°C и продолжает расти. Поле сдерживания разрушается. У вас есть минуты до катастрофического взрыва, который уничтожит всю станцию.", readings:"Темп. ядра: 15 247°C | Поле сдерживания: 23% | Радиация: 850 рад | Давление охладителя: Критическое" },
+                { title:"ОТКАЗ СИСТЕМЫ КИСЛОРОДА", desc:"Электролизные установки, расщепляющие воду на кислород, одновременно вышли из строя. Уровень CO2 быстро растёт на всех палубах. Члены экипажа жалуются на головную боль и головокружение. Запас воздуха: около 4 часов.", readings:"Уровень O2: 14% (падает) | CO2: 3,2% (растёт) | Электролиз: ОТКЛЮЧЁН | Резерв O2: 2 часа" },
+                { title:"ПРОБОИНА КОРПУСА — СЕКЦИЯ 7", desc:"Микрометеорит пробил внешний корпус в Секции 7 — жилых каютах. Воздух стремительно уходит в космос. Сирены давления ревут. Трое членов экипажа заперты за заклинившей переборочной дверью.", readings:"Давление секции 7: 0,6 атм (падает) | Пробоина: 4,2 см | Переборка: ЗАКЛИНЕНА | Заперто: 3 чел." },
+                { title:"НАВИГАЦИОННЫЙ КОМПЬЮТЕР ВЗЛОМАН", desc:"Неизвестная цифровая сущность заразила навигационный компьютер. Орбита станции деградирует — вы медленно падаете в гравитационное поле Юпитера. Управление двигателями заблокировано, компьютер выводит неизвестные символы.", readings:"Высота орбиты: 412 000 км (снижается) | Скорость спуска: 12 км/ч | Нав. компьютер: ВЗЛОМАН | Двигатели: ЗАБЛОКИРОВАНЫ" },
+                { title:"НАДВИГАЮЩАЯСЯ СОЛНЕЧНАЯ ВСПЫШКА", desc:"Датчики обнаружили мощный корональный выброс массы, направленный прямо на станцию. Удар через 45 минут. Электромагнитный импульс выведет из строя незащищённую электронику, а радиационный всплеск будет смертелен для открытого экипажа.", readings:"Класс вспышки: X-28 | Прибытие: 45 мин | Щиты: ОЖИДАНИЕ | Прогноз радиации: 2000+ рад" },
+                { title:"ОШИБКА ГЕНЕРАТОРА ГРАВИТАЦИИ", desc:"Центробежная система гравитации начала вращаться хаотично. В одних секциях — давящие 3G, в других — невесомость. Оборудование летает, экипаж ранен, опоры конструкции стонут под неравномерной нагрузкой.", readings:"Секция A: 3,1G | Секция B: 0,0G | Секция C: 1,8G | Мотор вращения: ХАОТИЧНЫЙ | Нагрузка: ВЫСОКАЯ" },
+                { title:"ЗАГРЯЗНЕНИЕ ВОДОСНАБЖЕНИЯ", desc:"Система очистки воды загрязнена неизвестным химическим соединением. Вся переработанная вода теперь токсична. Водоснабжение рассчитано на 50 членов экипажа, а чистой воды осталось лишь на 48 часов.", readings:"Загрязнение: НЕИЗВЕСТНОЕ СОЕДИНЕНИЕ | Токсичность: ВЫСОКАЯ | Резерв чистой воды: 48 ч | Затронутые системы: ВСЕ" },
+                { title:"УНИЧТОЖЕНИЕ АНТЕННЫ СВЯЗИ", desc:"Столкновение с космическим мусором полностью уничтожило главную антенну связи. Нет контакта с Землёй, нет возможности подать сигнал бедствия. Корабль снабжения прибудет через 3 недели и не будет знать ваших координат стыковки.", readings:"Главная антенна: УНИЧТОЖЕНА | Резервный передатчик: МАЛАЯ МОЩНОСТЬ | Дальность: 0,001 а.е. | Корабль: 21 день" },
+                { title:"ПОЖАР В ЛАБОРАТОРИИ", desc:"В главной лаборатории вспыхнул химический пожар. Система пожаротушения не сработала. Токсичные пары от горящих экспериментов распространяются через вентиляцию. Ценные исследования и незаменимые образцы под угрозой.", readings:"Темп. лаборатории: 340°C | Пожаротушение: ОТКЛЮЧЕНО | Токсичные пары: В ВЕНТИЛЯЦИИ | Вентиляция: ЗАГРЯЗНЕНА" },
+                { title:"ОТКАЗ СТЫКОВОЧНЫХ ЗАЖИМОВ", desc:"Автоматический грузовой корабль прибыл, но стыковочные зажимы неисправны. Корабль дрейфует ближе с неправильной траекторией. При столкновении — катастрофический ущерб. Если уплывёт — вы потеряете критически важные припасы.", readings:"Расстояние: 200 м | Скорость сближения: 2,1 м/с | Зажимы: ЗАКЛИНЕНЫ | Отклонение: 12°" },
+                { title:"МЕДИЦИНСКАЯ ЭКСТРЕННАЯ СИТУАЦИЯ", desc:"Доктор Васкес, ваш главный хирург, потеряла сознание с симптомами острого аппендицита. Она единственный хирург на борту. Автохирургический блок требует калибровки, которую знает только она, а её состояние быстро ухудшается.", readings:"Пациент: Д-р Васкес | Состояние: ОСТРЫЙ ЖИВОТ | Автохирург: НЕ ОТКАЛИБРОВАН | Медбаза: ДОСТУПНА" },
+                { title:"ЗАРАЖЕНИЕ ГИДРОПОНИКИ", desc:"Гидропонные сады, обеспечивающие 60% продовольствия станции, заражены агрессивным грибковым заболеванием. Растения быстро гибнут во всех отсеках выращивания. Без остановки заражения станции грозит голод через несколько недель.", readings:"Заражённые отсеки: 8/10 | Потеря урожая: 45% (растёт) | Тип грибка: НЕИЗВЕСТЕН | Запас пищи: 30 дней" },
+                { title:"КАСКАДНЫЙ ОТКАЗ ЭНЕРГОСИСТЕМЫ", desc:"Скачок в сети электропитания вызвал каскадный отказ. Системы отключаются палуба за палубой. Жизнеобеспечение на аварийных батареях с зарядом на 6 часов. Солнечные панели целы, но отключены от сети.", readings:"Сеть: ОТКЛЮЧЕНА | Батареи: 6 ч | Солнечные панели: РАБОТАЮТ (отключены) | Затронуты: ВСЕ палубы" },
+                { title:"БИОЛОГИЧЕСКАЯ УГРОЗА", desc:"Биодатчики обнаружили неизвестный живой организм в вентиляционных каналах. Предположительно, он попал из недавно собранного образца с Европы, спутника Юпитера. Организм быстро растёт и питается электроизоляцией станции.", readings:"Размер организма: РАСТЁТ | Местоположение: Шахты C-F | Состав: НЕИЗВЕСТЕН | Электроповреждения: РАСТУТ" },
+                { title:"НЕИСПРАВНОСТЬ СПАСАТЕЛЬНЫХ КАПСУЛ", desc:"Программный сбой активировал все 8 спасательных капсул на экстренный запуск. Обратный отсчёт: 10 минут. Если капсулы стартуют пустыми, экипаж потеряет все средства эвакуации. Панель управления за радиационной дверью с 30-минутным охлаждением.", readings:"Капсулы: ВСЕ АКТИВИРОВАНЫ | Обратный отсчёт: 10:00 | Панель управления: ЗА РАД. ДВЕРЬЮ | Охлаждение двери: 30 мин" },
+                { title:"СТОЛКНОВЕНИЕ С ПОЛЕМ ОБЛОМКОВ", desc:"Дальний радар показывает огромное поле космического мусора от разрушенного спутника. Тысячи фрагментов от 1 см до 2 м. Столкновение через 2 часа. Маневровые двигатели имеют ограниченный запас топлива.", readings:"Обломков: 4 700+ | Крупнейший: 2,1 м | Прибытие: 2 часа | Топливо двигателей: 34% | Бронеплиты: ЧАСТИЧНО" },
+                { title:"МЯТЕЖ ЭКИПАЖА", desc:"После месяцев в глубоком космосе напряжение достигло предела. Группа из 12 членов экипажа во главе с офицером Кейном угрожает захватить мостик и принудить к возвращению на Землю. Они заперлись в оружейном хранилище.", readings:"Мораль: 15% | Мятежников: 12/50 | Оружейная: ВСКРЫТА | Доступ к мостику: ОСПАРИВАЕТСЯ" },
+                { title:"УТЕЧКА ОХЛАДИТЕЛЯ ДВИГАТЕЛЯ", desc:"Основная линия охладителя двигателя разорвана. Перегретый охладитель разбрызгивается по машинному отделению. Двигатель перегревается, токсичные пары делают зону смертельной без защиты. Доступно лишь 2 костюма химзащиты.", readings:"Темп. двигателя: 890°C (растёт) | Охладитель: 12% | Токсичный пар: СМЕРТЕЛЕН | Костюмы: 2 шт." },
+                { title:"СМЕЩЕНИЕ СОЛНЕЧНЫХ БАТАРЕЙ", desc:"Система слежения солнечных панелей вышла из строя — все панели заблокированы в направлении от Солнца. Выработка энергии упала до 5%. Без восстановления за 12 часов жизнеобеспечение начнёт необратимо отказывать.", readings:"Генерация: 5% | Отклонение: 172° | Мотор слежения: ЗАКЛИНЕН | Резерв батарей: 12 часов" },
+                { title:"СТОЛКНОВЕНИЕ С АСТЕРОИДОМ", desc:"МАКСИМАЛЬНАЯ ТРЕВОГА: Астероид диаметром 50 метров на прямом курсе столкновения со станцией. Удар через 90 минут. Это катастрофическое событие для станции. Все предыдущие повреждения делают ситуацию экспоненциально опаснее.", readings:"Размер: 50 м | Скорость: 14 км/с | Прибытие: 90 мин | Вероятность: 99,7% | ВСЕ СИСТЕМЫ: ПЕРЕГРУЖЕНЫ" }
+            ],
+            kz: [
+                { title:"РЕАКТОР ӨЗЕГІНІҢ БАЛҚУЫ", desc:"Негізгі термоядролық реактор бақылаусыз тізбекті реакцияға ұшырауда. Өзек температурасы 15 000°C-тан асып, көтерілуде. Ұстау өрісі бұзылуда. Бүкіл станцияны жоятын апатты жарылысқа бірнеше минут қалды.", readings:"Өзек темп.: 15 247°C | Ұстау өрісі: 23% | Радиация: 850 рад | Салқындатқыш қысымы: Сыни" },
+                { title:"ОТТЕГІ ЖҮЙЕСІНІҢ ІСТЕН ШЫҒУЫ", desc:"Суды тыныс алатын оттегіге бөлетін электролиз қондырғылары бір уақытта істен шықты. CO2 деңгейі барлық палубаларда тез көтерілуде. Экипаж мүшелері бас ауруы мен бас айналуды хабарлауда. Тыныс алатын ауа қоры: 4 сағат.", readings:"O2 деңгейі: 14% (төмендеуде) | CO2: 3,2% (өсуде) | Электролиз: ӨШІРІЛГЕН | Резервтік O2: 2 сағат" },
+                { title:"КОРПУС ТЕСІГІ — 7-БӨЛІМ", desc:"Микрометеорит 7-бөлімде — экипаж каюталарында сыртқы корпусты тесіп өтті. Ауа ғарышқа тез шығуда. Қысым дабылдары шылдырлауда. Үш экипаж мүшесі кептеліп қалған аралық есіктің артында қалды.", readings:"7-бөлім қысымы: 0,6 атм (төмендеуде) | Тесік: 4,2 см | Аралық есік: КЕПТЕЛГЕН | Қалған экипаж: 3" },
+                { title:"НАВИГАЦИЯЛЫҚ КОМПЬЮТЕР БҰЗЫЛДЫ", desc:"Белгісіз сандық нысан навигациялық компьютерді жұқтырды. Станцияның орбитасы құлдырауда — Юпитердің гравитациясына баяу құлайсыз. Қозғалтқыш басқаруы бұғатталған, компьютер бейтаныс таңбаларды көрсетуде.", readings:"Орбита биіктігі: 412 000 км (төмендеуде) | Түсу жылдамдығы: 12 км/сағ | Нав. компьютер: БҰЗЫЛҒАН | Қозғалтқыштар: БҰҒАТТАЛҒАН" },
+                { title:"КҮН ЖАЛЫНЫ ҚАУПІ", desc:"Ғарыш датчиктері станцияға тікелей бағытталған қуатты коронарлық массалық шығарылуды анықтады. Соғу 45 минутта. Электромагниттік импульс қорғалмаған электрониканы жояды, радиациялық толқын ашық экипаж үшін өлімге әкеледі.", readings:"Жалын класы: X-28 | Келуі: 45 мин | Қалқан: КҮТУ РЕЖИМІ | Радиация болжамы: 2000+ рад" },
+                { title:"ГРАВИТАЦИЯ ГЕНЕРАТОРЫНЫҢ ҚАТЕСІ", desc:"Центрге тартқыш гравитация жүйесі хаотикалық айналуды бастады. Кейбір бөлімдерде 3G, басқаларында салмақсыздық. Жабдық ұшып жүр, экипаж жарақатталған, тірек конструкциялары біркелкі емес жүктемеден қысылуда.", readings:"A бөлімі: 3,1G | B бөлімі: 0,0G | C бөлімі: 1,8G | Айналу моторы: ХАОТИКАЛЫҚ | Құрылымдық жүктеме: ЖОҒАРЫ" },
+                { title:"СУ ҚОРЫНЫҢ ЛАСТАНУЫ", desc:"Суды тазалау жүйесі белгісіз химиялық қосылыспен ластанды. Барлық қайта өңделген су уытты. Станцияның су қоры 50 экипаж мүшесіне арналған, таза су резерві тек 48 сағатқа жетеді.", readings:"Ластану: БЕЛГІСІЗ ҚОСЫЛЫС | Уыттылық: ЖОҒАРЫ | Таза су резерві: 48 сағ | Зақымданған жүйелер: БАРЛЫҒЫ" },
+                { title:"БАЙЛАНЫС АНТЕННАСЫ ЖОЙЫЛДЫ", desc:"Ғарыш қоқысымен соқтығысу негізгі байланыс антеннасын толық жойды. Жермен байланыс жоқ, апат сигналын жіберу мүмкін емес. Жабдықтау кемесі 3 аптадан кейін келеді және сіздің координаталарыңызды білмейді.", readings:"Негізгі антенна: ЖОЙЫЛДЫ | Резервтік таратқыш: АЗ ҚУАТ | Сигнал ауқымы: 0,001 а.б. | Кеме: 21 күн" },
+                { title:"ЗЕРТХАНАДАҒЫ ӨРТ", desc:"Негізгі зертханада химиялық өрт шықты. Өрт сөндіру жүйесі іске қосылмады. Жанып жатқан тәжірибелерден уытты түтін желдету жүйесі арқылы таралуда. Құнды зерттеу деректері мен алмастырылмайтын үлгілер қауіп астында.", readings:"Зертхана темп.: 340°C | Өрт сөндіру: ӨШІРІЛГЕН | Уытты түтін: ЖЕЛДЕТУДЕ АНЫҚТАЛДЫ | Желдету: ЛАСТАНҒАН" },
+                { title:"ТҮЙІСУ ҚЫСҚЫШТАРЫНЫҢ АҚАУЛЫҒЫ", desc:"Автоматты жабдықтау кемесі келді, бірақ түйісу қысқыштары бұзылған. Кеме дұрыс емес траекториямен жақындауда. Соқтығысқанда — апатты зақым. Кетіп қалса — маңызды жабдықтарды жоғалтасыз.", readings:"Кеме қашықтығы: 200 м | Жақындау жылдамдығы: 2,1 м/с | Қысқыштар: КЕПТЕЛГЕН | Ауытқу: 12°" },
+                { title:"МЕДИЦИНАЛЫҚ ТӨТЕНШЕ ЖАҒДАЙ", desc:"Доктор Васкес, бас хирургіңіз, жедел аппендицит белгілерімен есінен танды. Ол бортта жалғыз хирург. Автохирургиялық блок тек ол білетін калибрлеуді қажет етеді, ал оның жағдайы тез нашарлауда.", readings:"Пациент: Д-р Васкес | Жағдай: ЖЕДЕЛ АБДОМЕН | Автохирург: КАЛИБРЛЕНБЕГЕН | Медбаза: ҚОЛЖЕТІМДІ" },
+                { title:"ГИДРОПОНИКА ЗАҚЫМДАНУЫ", desc:"Станцияның тамақ қорының 60%-ын қамтамасыз ететін гидропоникалық бақтар агрессивті саңырауқұлақ ауруымен зақымданды. Өсімдіктер барлық өсіру бөлімдерінде тез қырылуда. Аурудың алдын алмасаңыз, бірнеше аптада аштық қаупі.", readings:"Зақымданған бөлімдер: 8/10 | Егін жоғалтуы: 45% (өсуде) | Саңырауқұлақ түрі: БЕЛГІСІЗ | Тамақ қоры: 30 күн" },
+                { title:"ЭНЕРГИЯ ЖҮЙЕСІНІҢ КАСКАДТЫҚ АҚАУЛЫҒЫ", desc:"Негізгі электр желісіндегі кернеу секірісі каскадтық ақаулыққа себеп болды. Жүйелер палуба бойынша өшуде. Тіршілікті қамтамасыз ету 6 сағаттық аварияғалық батареяларда. Күн панельдері бүтін, бірақ желіден ажыратылған.", readings:"Негізгі жүйе: ӨШІРІЛГЕН | Батарея: 6 сағ | Күн панельдері: ЖҰМЫС ІСТЕЙДІ (ажыратылған) | Палубалар: БАРЛЫҒЫ" },
+                { title:"БИОЛОГИЯЛЫҚ ҚАУІП", desc:"Биодатчиктер желдету каналдарында белгісіз тірі организмді анықтады. Ол Юпитердің Европа серігінен жақында жиналған үлгіден келген сияқты. Организм тез өсуде және станцияның электр оқшаулағышымен қоректенуде.", readings:"Организм өлшемі: ӨСУДЕ | Орны: C-F шахталары | Құрамы: БЕЛГІСІЗ | Электр зақымы: ӨСУДЕ" },
+                { title:"ҚҰТҚАРУ КАПСУЛАЛАРЫНЫҢ АҚАУЛЫҒЫ", desc:"Бағдарламалық қате барлық 8 құтқару капсуласын апаттық ұшыруға қосты. Кері санақ: 10 минут. Капсулалар бос ұшса, экипаж эвакуация мүмкіндігінен айырылады. Басқару панелі 30 минуттық салқындатуды қажет ететін радиациялық есіктің артында.", readings:"Капсулалар: БАРЛЫҒЫ ҚОСЫЛҒАН | Кері санақ: 10:00 | Басқару: РАД. ЕСІКТІҢ АРТЫНДА | Есік салқындатуы: 30 мин" },
+                { title:"СЫНЫҚТАР АЛАҢЫМЕН СОҚТЫҒЫСУ", desc:"Қашықтық радары жойылған спутниктен қалған ғарыш қоқысының үлкен алаңын көрсетуде. 1 см-ден 2 м-ге дейінгі мыңдаған бөлшектер. Соқтығысу 2 сағатта. Маневрлік қозғалтқыштардың отыны шектеулі.", readings:"Сынықтар: 4 700+ бөлшек | Ең үлкені: 2,1 м | Келуі: 2 сағат | Отын: 34% | Қорғаныш тақтасы: ІШІНАРА" },
+                { title:"ЭКИПАЖ КӨТЕРІЛІСІ", desc:"Ғарышта бірнеше ай өткеннен кейін шиеленіс шегіне жетті. Офицер Кейн бастаған 12 экипаж мүшесі көпірді басып алып, Жерге оралуға мәжбүрлеуге қауіп төндіруде. Олар қару-жарақ қоймасында жабылып алды.", readings:"Мораль: 15% | Көтерілушілер: 12/50 | Қару қоймасы: АШЫЛҒАН | Көпір рұқсаты: ДАУЛЫ" },
+                { title:"ҚОЗҒАЛТҚЫШ САЛҚЫНДАТҚЫШЫНЫҢ АҒУЫ", desc:"Қозғалтқыштың негізгі салқындатқыш желісі жарылды, қызып кеткен салқындатқыш машина бөлмесіне шашырауда. Қозғалтқыш қызып кетуде, уытты бу аймақты қорғаныс құралдарынсыз өлімге әкелуде. Тек 2 химиялық қорғаныс костюмі бар.", readings:"Қозғалтқыш темп.: 890°C (өсуде) | Салқындатқыш: 12% | Уытты бу: ӨЛІМГЕ ӘКЕЛЕДІ | Костюмдер: 2 дана" },
+                { title:"КҮН БАТАРЕЯЛАРЫНЫҢ АУЫТҚУЫ", desc:"Станцияның күн панельдерінің қадағалау жүйесі істен шықты — барлық панельдер Күннен кері бағытта бұғатталған. Энергия өндірісі 5%-ға дейін төмендеді. 12 сағат ішінде толық қуат қалпына келтірілмесе, тіршілікті қамтамасыз ету мүлдем істен шығады.", readings:"Генерация: 5% | Ауытқу: 172° | Қадағалау моторы: КЕПТЕЛГЕН | Батарея резерві: 12 сағат" },
+                { title:"АСТЕРОИДПЕН СОҚТЫҒЫСУ", desc:"МАКСИМАЛДЫ ДАБЫЛ: Станциямен тікелей соқтығысу курсында 50 метрлік астероид анықталды. Соққы 90 минутта. Бұл станция үшін апатты оқиға. Барлық алдыңғы зақымдар жағдайды экспоненциалды түрде қауіптірек етеді.", readings:"Астероид: 50 м | Жылдамдық: 14 км/с | Келуі: 90 мин | Соқтығысу ықтималдығы: 99,7% | БАРЛЫҚ ЖҮЙЕЛЕР: ШЕКТЕЛГЕН" }
+            ]
+        };
+
+        // ======== TRANSLATED KEYWORDS (per scenario, per language) ========
+        const keywordsI18n = {
+            ru: [
+                ["охладитель","отключение","сдерживание","стержни","контроль","аварийный","вентиляция","радиация","герметизация","резервный"],
+                ["электролиз","ремонт","резервный","баллоны","co2","скрубберы","фильтры","вентиляция","кислород","вода"],
+                ["герметизация","заплатка","переборка","эвакуация","давление","шлюз","сварка","аварийный","спасение","скафандр"],
+                ["перезагрузка","ручной","резервный","брандмауэр","двигатели","переопределение","изоляция","вирус","очистка","орбита"],
+                ["щит","укрытие","радиация","фарадей","экранирование","электроника","защита","бункер","магнитный","энергия"],
+                ["стабилизация","мотор","калибровка","вращение","постепенно","закрепить","снижение","подшипники","баланс","замедление"],
+                ["фильтр","очистка","дистилляция","изоляция","загрязнение","анализ","резервный","запас","химический","промывка"],
+                ["ремонт","антенна","сигнал","усиление","передатчик","маяк","частота","утилизация","ретранслятор","аварийный"],
+                ["огнетушитель","вентиляция","герметизация","подавление","кислород","эвакуация","отключить","изоляция","пена","разгерметизация"],
+                ["ручной","двигатели","выравнивание","зажимы","переопределение","трос","выход","космос","направление","замедление"],
+                ["хирургия","база данных","инструкции","калибровка","автоматический","руководство","анестезия","удалённый","земля","помощь"],
+                ["карантин","фунгицид","изоляция","образцы","очистка","стерилизация","семена","запас","рацион","ультрафиолет"],
+                ["обход","перенаправление","солнечный","переподключение","цепь","выключатель","сброс","приоритет","распределение","ремонт"],
+                ["сдерживание","ловушка","изоляция","образец","герметизация","вентиляция","температура","заморозка","захват","карантин"],
+                ["отмена","переопределение","провода","программа","взлом","отключение","ручной","обрезка","питание","удалённый"],
+                ["маневр","уклонение","щит","траектория","расчёт","поворот","защита","броня","двигатель","отслеживание"],
+                ["переговоры","разговор","компромисс","слушать","посредничество","успокоить","обращение","жалобы","безопасность","коммуникация"],
+                ["химзащита","костюм","клапан","отключение","герметизация","заплатка","охладитель","замена","вентиляция","удалённый"],
+                ["выравнивание","ручной","мотор","выход","космос","ремонт","слежение","калибровка","поворот","переопределение"],
+                ["эвакуация","отклонение","тяга","перемещение","перенаправление","ракета","лазер","фрагментация","орбита","спасательный","капсулы","расчёт"]
+            ],
+            kz: [
+                ["салқындатқыш","өшіру","ұстау","стержендер","бақылау","апаттық","желдету","радиация","герметизация","резервтік"],
+                ["электролиз","жөндеу","резервтік","баллондар","co2","скрубберлер","сүзгілер","желдету","оттегі","су"],
+                ["герметизация","жамау","аралық","эвакуация","қысым","шлюз","дәнекерлеу","апаттық","құтқару","скафандр"],
+                ["қайта жүктеу","қолмен","резервтік","брандмауэр","қозғалтқыштар","қайта анықтау","оқшаулау","вирус","тазалау","орбита"],
+                ["қалқан","баспана","радиация","фарадей","экрандау","электроника","қорғау","бункер","магниттік","қуат"],
+                ["тұрақтандыру","мотор","калибрлеу","айналу","біртіндеп","бекіту","азайту","подшипниктер","тепе-теңдік","баяулату"],
+                ["сүзгі","тазалау","дистилляция","оқшаулау","ластану","талдау","резервтік","қор","химиялық","жуу"],
+                ["жөндеу","антенна","сигнал","күшейту","таратқыш","маяк","жиілік","қайта пайдалану","ретранслятор","апаттық"],
+                ["өрт сөндіргіш","желдету","герметизация","басу","оттегі","эвакуация","өшіру","оқшаулау","көбік","қысымсыздандыру"],
+                ["қолмен","қозғалтқыштар","туралау","қысқыштар","қайта анықтау","арқан","шығу","ғарыш","бағыттау","баяулату"],
+                ["хирургия","деректер базасы","нұсқаулар","калибрлеу","автоматты","нұсқаулық","анестезия","қашықтан","жер","көмек"],
+                ["карантин","фунгицид","оқшаулау","үлгілер","тазалау","стерилизация","тұқымдар","қор","мөлшерлеу","ультракүлгін"],
+                ["айналып өту","қайта бағыттау","күн","қайта қосу","тізбек","ажыратқыш","қалпына келтіру","басымдық","тарату","жөндеу"],
+                ["ұстау","тұзақ","оқшаулау","үлгі","герметизация","желдету","температура","мұздату","аулау","карантин"],
+                ["болдырмау","қайта анықтау","сымдар","бағдарлама","бұзу","өшіру","қолмен","кесу","қуат","қашықтан"],
+                ["маневр","жалтару","қалқан","траектория","есептеу","бұру","қорғау","сауыт","қозғалтқыш","бақылау"],
+                ["келіссөздер","сөйлесу","ымыраға келу","тыңдау","делдалдық","тыныштандыру","жүгіну","шағымдар","қауіпсіздік","байланыс"],
+                ["химқорғаныс","костюм","клапан","өшіру","герметизация","жамау","салқындатқыш","ауыстыру","желдету","қашықтан"],
+                ["туралау","қолмен","мотор","шығу","ғарыш","жөндеу","бақылау","калибрлеу","бұру","қайта анықтау"],
+                ["эвакуация","бұру","тарту","жылжыту","қайта бағыттау","зымыран","лазер","фрагментация","орбита","құтқару","капсулалар","есептеу"]
+            ]
+        };
+
+        // ======== STATE ========
+        let currentScenarioIndex = 0;
+        let stats = { integrity: 100, health: 100, oxygen: 100, power: 100 };
+        let scenarioScores = [];
+        let gameState = 'intro';
+        let aiRequestInProgress = false;
+        let audioCtx;
+        let introTypingActive = false;
+
+        // Store last feedback data so we can re-render on language change
+        let lastFeedback = null; // { scenarioIndex, hitIndices, missIndices, score, langAtEval }
+
+        // ======== AUDIO ========
+        function playSound(type) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            if (type === 'beep') { osc.type='sine'; osc.frequency.setValueAtTime(600,audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(350,audioCtx.currentTime+0.12); gain.gain.setValueAtTime(0.06,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.12); osc.start(); osc.stop(audioCtx.currentTime+0.15); }
+            else if (type === 'click') { osc.type='triangle'; osc.frequency.setValueAtTime(900,audioCtx.currentTime); gain.gain.setValueAtTime(0.03,audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.04); osc.start(); osc.stop(audioCtx.currentTime+0.04); }
+        }
+
+        // ======== DOM REFS ========
+        const introScreen = document.getElementById('intro-screen');
+        const introTextEl = document.getElementById('intro-text');
+        const startBtn = document.getElementById('start-btn');
+        const gameContainer = document.getElementById('game-container');
+        const terminalBox = document.getElementById('terminal-interface');
+        const feedbackPanel = document.getElementById('feedback-panel');
+        const playerInput = document.getElementById('player-input');
+
+        // ======== TYPEWRITER ========
+        let typewriterTimeout = null;
+        function typeWriter(text, element, speed, callback) {
+            if (typewriterTimeout && element === introTextEl) clearTimeout(typewriterTimeout);
+            let i = 0;
+            element.innerHTML = "";
+            element.classList.add('cursor-blink');
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i) === '\n' ? '<br>' : text.charAt(i);
+                    i++;
+                    const tid = setTimeout(type, speed);
+                    if (element === introTextEl) typewriterTimeout = tid;
+                } else {
+                    element.classList.remove('cursor-blink');
+                    if (callback) callback();
+                }
+            }
+            type();
+        }
+
+        // ======== LANGUAGE FUNCTIONS ========
+        function t(key) { return UI[currentLang][key] || UI.en[key] || key; }
+
+        function getScenarioText(index) {
+            const base = scenarios[index];
+            if (currentLang === 'en' || !scenarioI18n[currentLang]) return { title: base.title, desc: base.desc, readings: base.readings };
+            const tr = scenarioI18n[currentLang][index];
+            return tr ? { title: tr.title, desc: tr.desc, readings: tr.readings } : { title: base.title, desc: base.desc, readings: base.readings };
+        }
+
+        function getScenarioKeywords(index) {
+            if (currentLang === 'en' || !keywordsI18n[currentLang]) return scenarios[index].keywords;
+            return keywordsI18n[currentLang][index] || scenarios[index].keywords;
+        }
+
+        function setLang(lang) {
+            currentLang = lang;
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.lang === lang);
+            });
+            applyLanguage();
+        }
+
+        function renderKeywordFeedback() {
+            if (!lastFeedback) return;
+            const kwEl = document.getElementById('keyword-feedback');
+            const keywords = getScenarioKeywords(lastFeedback.scenarioIndex);
+            kwEl.innerHTML = "";
+            lastFeedback.hitIndices.forEach(idx => {
+                const kw = keywords[idx] || '?';
+                kwEl.innerHTML += `<span class="bg-emerald-900/30 text-emerald-300/80 px-2 py-1 rounded border border-emerald-700/40">✓ ${kw}</span>`;
+            });
+            lastFeedback.missIndices.forEach(idx => {
+                const kw = keywords[idx] || '?';
+                kwEl.innerHTML += `<span class="bg-gray-800/40 text-gray-400/70 px-2 py-1 rounded border border-gray-700/30">○ ${kw}</span>`;
+            });
+        }
+
+        function renderFeedbackText() {
+            if (!lastFeedback) return;
+            const score = lastFeedback.score;
+            const titleEl = document.getElementById('feedback-title');
+            const textEl = document.getElementById('feedback-text');
+            const scoreEl = document.getElementById('feedback-score');
+
+            let colorClass = "";
+            if (score >= 70) {
+                titleEl.innerText = t('crisisResolved');
+                titleEl.className = "header-font text-2xl font-bold mb-2 text-emerald-400/90";
+                colorClass = "text-emerald-400/90";
+                textEl.innerText = t('feedbackGood');
+            } else if (score >= 40) {
+                titleEl.innerText = t('partiallyResolved');
+                titleEl.className = "header-font text-2xl font-bold mb-2 text-amber-300/90";
+                colorClass = "text-amber-300/90";
+                textEl.innerText = t('feedbackPartial');
+            } else {
+                titleEl.innerText = t('roomForImprovement');
+                titleEl.className = "header-font text-2xl font-bold mb-2 text-orange-300/80";
+                colorClass = "text-orange-300/80";
+                textEl.innerText = t('feedbackBad');
+            }
+            scoreEl.innerText = `${score}%`;
+            scoreEl.className = `text-4xl font-mono font-bold mb-5 ${colorClass}`;
+        }
+
+        function applyLanguage() {
+            // Intro
+            startBtn.textContent = t('initSystems');
+            if (gameState === 'intro') {
+                typeWriter(t('introMsg'), introTextEl, 30, () => {
+                    setTimeout(() => startBtn.classList.remove('hidden'), 500);
+                });
+            }
+
+            // Status bar
+            document.getElementById('lbl-console').textContent = t('console');
+            document.getElementById('lbl-hull').textContent = t('hull');
+            document.getElementById('lbl-crew').textContent = t('crew');
+            document.getElementById('lbl-pwr').textContent = t('pwr');
+            document.getElementById('lbl-scenario').textContent = t('scenarioLabel');
+
+            // Terminal
+            document.getElementById('lbl-alert').textContent = t('alert');
+            document.getElementById('lbl-telemetry').textContent = t('telemetry');
+            document.getElementById('lbl-ai-advisor').textContent = t('aiAdvisor');
+            document.getElementById('lbl-command').textContent = t('commandInput');
+            document.getElementById('lbl-ai-assist').textContent = t('aiAssist');
+            document.getElementById('submit-btn').textContent = t('executeProtocol');
+            playerInput.placeholder = t('placeholder');
+
+            const len = playerInput.value.length;
+            document.getElementById('char-count').textContent = `${len} ${t('chars')}`;
+
+            // Feedback panel
+            document.getElementById('lbl-mission-log').textContent = t('missionLog');
+            document.getElementById('lbl-keyword').textContent = t('keywordAnalysis');
+            document.getElementById('lbl-next-crisis').textContent = t('nextCrisis');
+            document.getElementById('feedback-placeholder').textContent = t('awaitingInput');
+
+            // Re-render feedback keywords and text if feedback is showing
+            if (lastFeedback) {
+                renderKeywordFeedback();
+                renderFeedbackText();
+            }
+
+            // Game over
+            document.getElementById('lbl-f-integrity').textContent = t('integrity');
+            document.getElementById('lbl-f-health').textContent = t('health');
+            document.getElementById('lbl-f-oxygen').textContent = t('oxygen');
+            document.getElementById('lbl-f-power').textContent = t('power');
+            document.getElementById('th-scenario').textContent = t('thScenario');
+            document.getElementById('th-efficiency').textContent = t('thEfficiency');
+            document.getElementById('th-status').textContent = t('thStatus');
+            document.getElementById('btn-restart').textContent = t('restartSim');
+
+            // Update scenario text if playing
+            if (gameState === 'playing') {
+                const st = getScenarioText(currentScenarioIndex);
+                document.getElementById('scenario-title').textContent = st.title;
+                document.getElementById('scenario-desc').textContent = st.desc;
+                document.getElementById('system-readings').textContent = st.readings;
+            }
+
+            // Update game over summary if visible
+            if (gameState === 'gameover') {
+                refreshGameOverScreen();
+            }
+        }
+
+        function refreshGameOverScreen() {
+            const avg = scenarioScores.length ? Math.round(scenarioScores.reduce((a,b) => a + b.score, 0) / scenarioScores.length) : 0;
+            const titleEl = document.getElementById('final-title');
+            const rankEl = document.getElementById('final-rank');
+            const wasCompleted = scenarioScores.length >= scenarios.length;
+
+            if (!wasCompleted) {
+                titleEl.innerText = t('simulationEnded');
+                titleEl.className = "text-5xl md:text-7xl font-bold mb-2 header-font text-amber-300/80";
+                rankEl.innerText = t('systemsCritical');
+                rankEl.className = "text-base mb-8 uppercase tracking-widest font-mono text-amber-200/60";
+            } else {
+                titleEl.innerText = t('missionComplete');
+                titleEl.className = "text-5xl md:text-7xl font-bold mb-2 header-font text-cyan-400/90";
+                let rank = t('cadet'), color = "text-gray-400";
+                if (avg >= 90) { rank = t('legendary'); color = "text-cyan-300/90"; }
+                else if (avg >= 70) { rank = t('senior'); color = "text-emerald-400/80"; }
+                else if (avg >= 50) { rank = t('junior'); color = "text-amber-300/80"; }
+                rankEl.innerText = `${t('rankLabel')}: ${rank}`;
+                rankEl.className = `text-2xl mb-8 uppercase tracking-widest font-mono ${color}`;
+            }
+
+            const tbody = document.getElementById('scenario-summary-list');
+            tbody.innerHTML = "";
+            scenarioScores.forEach((s, i) => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-gray-800/40 hover:bg-white/3";
+                const color = s.score >= 70 ? "text-emerald-400/80" : (s.score >= 40 ? "text-amber-300/80" : "text-orange-300/70");
+                const statusLabel = s.score >= 70 ? t('resolved') : (s.score >= 40 ? t('partial') : t('review'));
+                const sTitle = getScenarioText(s.index).title;
+                tr.innerHTML = `<td class="text-left py-2 text-gray-600">${i+1}</td><td class="text-left py-2 text-gray-300">${sTitle}</td><td class="text-right py-2 ${color}">${s.score}%</td><td class="text-right py-2 ${color}">${statusLabel}</td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // ======== INIT ========
+        window.onload = () => {
+            setTimeout(() => {
+                typeWriter(t('introMsg'), introTextEl, 30, () => {
+                    setTimeout(() => startBtn.classList.remove('hidden'), 500);
+                });
+            }, 500);
+        };
+
+        startBtn.addEventListener('click', () => {
+            playSound('click');
+            introScreen.style.display = 'none';
+            document.body.classList.remove('intro-mode');
+            document.body.classList.add('game-mode');
+            gameContainer.style.display = 'flex';
+            gameContainer.classList.remove('hidden');
+            gameState = 'playing';
+            startGame();
+        });
+
+        function startGame() {
+            currentScenarioIndex = 0;
+            stats = { integrity: 100, health: 100, oxygen: 100, power: 100 };
+            scenarioScores = [];
+            lastFeedback = null;
+            updateStatsUI();
+            loadScenario(0);
+        }
+
+        function updateStatsUI() {
+            ['integrity','health','oxygen','power'].forEach(stat => {
+                const val = Math.max(0, Math.floor(stats[stat]));
+                document.getElementById(`val-${stat}`).innerText = `${val}%`;
+                const bar = document.getElementById(`stat-${stat}`);
+                bar.style.width = `${val}%`;
+                bar.className = 'stat-fill h-full transition-all duration-800 rounded-sm ';
+                if(val < 30) bar.classList.add('bg-red-400/70');
+                else if(val < 60) bar.classList.add('bg-yellow-400/70');
+                else bar.classList.add('bg-cyan-400/70');
+            });
+        }
+
+        function loadScenario(index) {
+            if (index >= scenarios.length) { endGame(true); return; }
+            if (stats.integrity <= 0 || stats.health <= 0 || stats.oxygen <= 0 || stats.power <= 0) { endGame(false); return; }
+
+            currentScenarioIndex = index;
+            lastFeedback = null; // Clear feedback state for new scenario
+            const st = getScenarioText(index);
+
+            document.getElementById('scenario-counter').innerText = `${index + 1} / 20`;
+            document.getElementById('scenario-title').innerText = st.title;
+            document.getElementById('scenario-desc').innerText = st.desc;
+            document.getElementById('system-readings').innerText = st.readings;
+
+            document.getElementById('ai-section').classList.add('hidden');
+            document.getElementById('ai-section').classList.remove('flex');
+            document.getElementById('ai-response-box').innerHTML = '';
+            aiRequestInProgress = false;
+
+            playerInput.value = "";
+            playerInput.disabled = false;
+            playerInput.focus();
+            document.getElementById('char-count').innerText = `0 ${t('chars')}`;
+
+            const submitBtn = document.getElementById('submit-btn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = t('executeProtocol');
+            document.getElementById('ai-assist-btn').disabled = false;
+
+            feedbackPanel.querySelector('#feedback-placeholder').style.display = 'flex';
+            feedbackPanel.querySelector('#feedback-content').style.opacity = '0';
+            terminalBox.classList.remove('result-border-fail','result-border-partial','result-border-success');
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            playSound('beep');
+            terminalBox.classList.add('pulse-border-red');
+            setTimeout(() => terminalBox.classList.remove('pulse-border-red'), 2500);
+        }
+
+        // ======== INPUT ========
+        playerInput.addEventListener('input', (e) => {
+            const len = e.target.value.length;
+            document.getElementById('char-count').innerText = `${len} ${t('chars')}`;
+            document.getElementById('submit-btn').disabled = len < 20;
+        });
+
+        // ======== GROQ API ========
+        const GROQ_API_KEY = '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';
+        const GROQ_MODEL = 'llama-3.1-8b-instant';
+
+        document.getElementById('ai-assist-btn').addEventListener('click', async () => {
+            playSound('click');
+            const aiBox = document.getElementById('ai-section');
+            const aiContent = document.getElementById('ai-response-box');
+            aiBox.classList.remove('hidden');
+            aiBox.classList.add('flex');
+
+            if (!GROQ_API_KEY) { aiContent.innerHTML = `<span class='text-red-400/70'>${t('apiKeyMissing')}</span>`; return; }
+            if (aiRequestInProgress) return;
+            aiRequestInProgress = true;
+
+            aiContent.innerHTML = `<div class="ai-loading text-cyan-400/60">${t('analyzingCrisis')}<span></span><span></span><span></span></div>`;
+
+            const scenario = scenarios[currentScenarioIndex];
+            const st = getScenarioText(currentScenarioIndex);
+            const langInstr = t('aiLangInstruction');
+            const prompt = `You are Kaoru, the onboard AI system of Space Station Omega — a deep-space research station currently orbiting Jupiter.
+${langInstr ? '\n' + langInstr + '\n' : ''}
+The station is facing a critical crisis that requires immediate action from the Chief Engineer.
+
+=== CRISIS BRIEFING ===
+Crisis: ${st.title}
+Situation: ${st.desc}
+Live System Readings: ${st.readings}
+
+=== YOUR TASK ===
+Provide a detailed, structured emergency advisory to the Chief Engineer. Your response should:
+
+1. Situation Assessment — Briefly summarize the immediate danger and what will happen if no action is taken (1-2 sentences).
+2. Recommended Action Plan — Give a clear step-by-step procedure (3-5 steps) with specific technical actions the engineer should take. Be precise — mention exact systems, tools, techniques, and procedures.
+3. Critical Warning — Mention one key risk or thing to avoid during the procedure (1 sentence).
+4. Estimated Outcome — What the expected result will be if the plan is executed correctly (1 sentence).
+
+Write in a professional, calm, in-character tone as a station AI. Use technical language appropriate for a space station engineer. Do NOT use markdown formatting — write in plain text with numbered steps. Keep total response between 100-180 words.`;
+
+            try {
+                const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_API_KEY}` },
+                    body: JSON.stringify({
+                        model: GROQ_MODEL,
+                        messages: [
+                            { role: "system", content: `You are Kaoru, the onboard AI advisor of Space Station Omega. You speak in a calm, professional, technical tone. You provide detailed but clear emergency guidance. Never use markdown formatting (no **, no ##, no bullets). Use plain numbered lists for steps. Keep responses between 100-180 words. ${langInstr}` },
+                            { role: "user", content: prompt }
+                        ],
+                        temperature: 0.6, max_tokens: 400
+                    })
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error.message || "API Error");
+                if (data.choices && data.choices[0]) {
+                    typeWriter(data.choices[0].message.content, aiContent, 12);
+                } else {
+                    aiContent.innerHTML = `<span class='text-yellow-400/70'>${t('signalInterference')}</span>`;
+                }
+            } catch (err) {
+                console.error("AI Request Failed:", err);
+                aiContent.innerHTML = `<span class='text-amber-400/70'>${t('neuralLinkInterrupted')}</span>`;
+            }
+        });
+
+        // ======== SUBMIT ========
+        document.getElementById('submit-btn').addEventListener('click', () => {
+            playSound('click');
+            if (playerInput.value.length < 20) return;
+            evaluate(playerInput.value);
+        });
+
+        function evaluate(text) {
+            playerInput.disabled = true;
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('ai-assist-btn').disabled = true;
+
+            const scenario = scenarios[currentScenarioIndex];
+            const keywords = getScenarioKeywords(currentScenarioIndex);
+            const lowerText = text.toLowerCase();
+
+            let hitIndices = [];
+            let missIndices = [];
+
+            keywords.forEach((kw, idx) => {
+                if (lowerText.includes(kw.toLowerCase())) {
+                    hitIndices.push(idx);
+                } else {
+                    missIndices.push(idx);
+                }
+            });
+
+            let score = Math.round((hitIndices.length / keywords.length) * 100);
+            if (score > 100) score = 100;
+
+            // Store feedback state for re-rendering on lang change
+            lastFeedback = {
+                scenarioIndex: currentScenarioIndex,
+                hitIndices: hitIndices,
+                missIndices: missIndices,
+                score: score
+            };
+
+            scenarioScores.push({ index: currentScenarioIndex, title: scenario.title, score });
+            applyConsequences(score, scenario);
+
+            document.getElementById('feedback-placeholder').style.display = 'none';
+            document.getElementById('feedback-content').style.opacity = '1';
+
+            // Render feedback title, score, text
+            renderFeedbackText();
+
+            // Apply border class
+            terminalBox.classList.remove('result-border-fail','result-border-partial','result-border-success');
+            if (score >= 70) {
+                terminalBox.classList.add('result-border-success');
+            } else if (score >= 40) {
+                terminalBox.classList.add('result-border-partial');
+            } else {
+                terminalBox.classList.add('result-border-fail');
+            }
+
+            // Render keyword tags
+            renderKeywordFeedback();
+
+            const bar = document.getElementById('next-timer-bar');
+            bar.style.transition = 'none'; bar.style.width = '0%';
+            setTimeout(() => { bar.style.transition = 'width 6s linear'; bar.style.width = '100%'; }, 50);
+            setTimeout(() => loadScenario(currentScenarioIndex + 1), 6500);
+        }
+
+        function applyConsequences(score, scenario) {
+            // 50% or higher = no damage to station
+            // 25-49% = moderate damage
+            // below 25% = heavy damage
+            let multiplier = 0;
+            if (score < 25) multiplier = 0.7;
+            else if (score < 50) multiplier = 0.35;
+            // score >= 50: multiplier stays 0, no damage
+
+            if (multiplier > 0 && scenario.failStats) {
+                if (scenario.failStats.integrity) stats.integrity -= scenario.failStats.integrity * multiplier;
+                if (scenario.failStats.health) stats.health -= scenario.failStats.health * multiplier;
+                if (scenario.failStats.oxygen) stats.oxygen -= scenario.failStats.oxygen * multiplier;
+                if (scenario.failStats.power) stats.power -= scenario.failStats.power * multiplier;
+            }
+            updateStatsUI();
+        }
+
+        function endGame(completed) {
+            gameState = 'gameover';
+            lastFeedback = null;
+            gameContainer.style.display = 'none';
+            const goScreen = document.getElementById('game-over-screen');
+            goScreen.classList.remove('hidden'); goScreen.classList.add('flex');
+
+            refreshGameOverScreen();
+
+            document.getElementById('final-integrity').innerText = Math.floor(Math.max(0, stats.integrity)) + "%";
+            document.getElementById('final-health').innerText = Math.floor(Math.max(0, stats.health)) + "%";
+            document.getElementById('final-oxygen').innerText = Math.floor(Math.max(0, stats.oxygen)) + "%";
+            document.getElementById('final-power').innerText = Math.floor(Math.max(0, stats.power)) + "%";
+        }
+    </script>
+</body>
+</html>
